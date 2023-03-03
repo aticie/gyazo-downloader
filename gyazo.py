@@ -16,14 +16,23 @@ class Gyazo:
         self.params = {"access_token": self._access_token}
 
     def get_images(self):
-        return self.get("/images")
+        params = {"per_page": 2}
+        response = self.get("/images", params=params)
+        images = response.json()
+        total_count = response.headers["X-Total-Count"]
 
-    def get(self, path: str):
+        for page in range(2, int(total_count) // 2 + 2):
+            params["page"] = page
+            response = self.get("/images", params=params)
+            images.extend(response.json())
+
+        return images
+
+    def get(self, path: str, params: dict):
         url = self.BASE_URL + path
-        params = {"access_token": self._access_token}
+        params.update({"access_token": self._access_token})
         with requests.get(url, params=params) as response:
-            response.raise_for_status()
-            return response.json()
+            return response
 
     def download_image(self, image: dict):
         image_id = image["image_id"]
