@@ -1,9 +1,17 @@
 import argparse
 import datetime
+import logging
 import os
 
 import filedate
 import requests
+
+logger = logging.getLogger("gyazo")
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(message)s")
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 
 class Gyazo:
@@ -43,7 +51,7 @@ class Gyazo:
             with open(os.path.join(self._save_folder, file_name), "wb") as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
-        print(f"Downloaded {image_id} to {file_name}")
+        logger.info(f"Downloaded {image_id} to {file_name}")
 
     def change_datetime(self, image):
         image_name = image["metadata"]["title"]
@@ -66,10 +74,14 @@ if __name__ == '__main__':
     os.makedirs(args.save_folder, exist_ok=True)
 
     gyazo_images = gyazo.get_images()
+    logger.info(f"Found {len(gyazo_images)} images on Gyazo")
     local_images = {image_name for image_name in os.listdir(args.save_folder) if os.path.isfile(image_name)}
 
     for image in gyazo_images:
         image_name = image["metadata"]["title"]
         if image_name not in local_images:
+            logger.info(f"Downloading {image_name}")
             gyazo.download_image(image)
+
+        logger.info(f"Changing date for: {image_name}")
         gyazo.change_datetime(image)
