@@ -24,12 +24,14 @@ class Gyazo:
         self.params = {"access_token": self._access_token}
 
     def get_images(self):
+        logger.info(f"Searching for images")
         params = {"per_page": 100}
         response = self.get("/images", params=params)
         images = response.json()
         total_count = response.headers["X-Total-Count"]
 
         for page in range(2, int(total_count) // 100 + 2):
+            logger.info(f"Searching for images ({page})")
             params["page"] = page
             response = self.get("/images", params=params)
             images.extend(response.json())
