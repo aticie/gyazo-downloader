@@ -21,17 +21,18 @@ class Gyazo:
         self._save_folder = save_folder
         self._access_token = access_token
 
-        self.params = {"access_token": self._access_token}
+        self.headers = {"Authorization": f"Bearer {self._access_token}"}
 
     def get_images(self):
-        logger.info(f"Searching for images")
-        params = {"per_page": 100}
+        logger.info(f"Collecting your images")
+        per_page = 100
+        params = {"per_page": per_page}
         response = self.get("/images", params=params)
         images = response.json()
         total_count = response.headers["X-Total-Count"]
-
-        for page in range(2, int(total_count) // 100 + 2):
-            logger.info(f"Searching for images ({page})")
+        total_pages = int(total_count) // per_page + 2
+        for page in range(2, total_pages):
+            logger.info(f"Collecting your images ({page}/{total_pages - 1})")
             params["page"] = page
             response = self.get("/images", params=params)
             images.extend(response.json())
@@ -40,23 +41,17 @@ class Gyazo:
 
     def get(self, path: str, params: dict):
         url = self.BASE_URL + path
-        params.update({"access_token": self._access_token})
-        with requests.get(url, params=params) as response:
+        with requests.get(url, params=params, headers=self.headers) as response:
             return response
 
-    def download_image(self, image: dict):
-        image_id = image["image_id"]
-        file_name = image["metadata"]["title"]
-        url = image["url"]
-        with requests.get(url, stream=True) as response:
-            response.raise_for_status()
-            with open(os.path.join(self._save_folder, file_name), "wb") as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-        logger.info(f"Downloaded {image_id} to {file_name}")
+    def post(self, path: str, params: dict):
+        url = self.BASE_URL + path
+        with requests.post(url, params=params, headers=self.headers) as response:
+            return response
 
     def change_datetime(self, image):
         image_name = image["metadata"]["title"]
+        logger.info(f"Changing date for: {image_name}")
         new_date = datetime.datetime.strptime(image["created_at"], "%Y-%m-%dT%H:%M:%S+%f").strftime("%Y-%m-%d %H:%M:%S")
         file = filedate.File(os.path.join(self._save_folder, image_name))
         file.set(
@@ -77,13 +72,12 @@ if __name__ == '__main__':
 
     gyazo_images = gyazo.get_images()
     logger.info(f"Found {len(gyazo_images)} images on Gyazo")
-    local_images = {image_name for image_name in os.listdir(args.save_folder) if os.path.isfile(image_name)}
+    local_images = {image_name for image_name in os.listdir(args.save_folder) if
+                    os.path.isfile(os.path.join(args.save_folder, image_name))}
 
     for image in gyazo_images:
-        image_name = image["metadata"]["title"]
-        if image_name not in local_images:
-            logger.info(f"Downloading {image_name}")
-            gyazo.download_image(image)
-
-        logger.info(f"Changing date for: {image_name}")
-        gyazo.change_datetime(image)
+        try:
+            gyazo.change_datetime(image)
+        except FileNotFoundError as e:
+            logger.warning(f"File not found: {e}")
+            continue
