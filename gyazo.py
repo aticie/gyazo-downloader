@@ -78,6 +78,6 @@ if __name__ == '__main__':
     for image in gyazo_images:
         try:
             gyazo.change_datetime(image)
-        except FileNotFoundError as e:
-            logger.warning(f"File not found: {e}")
+        except:
+            logger.warning(f"File not found or has unknown characters. Skipping: {image['metadata']['title']}")
             continue
